@@ -80,7 +80,15 @@ void read_user_input(char message[]) {
 void load_cookie() {
     // TODO: For Part 1.2, write your file operation code here.
     // Hint: The file path of the cookie is stored in COOKIE_PATH.
-    session_id = -1; // You may move this line to anywhere inside this fucntion.
+    
+    FILE *reader;
+    
+    if (reader = fopen(COOKIE_PATH, "r")) {
+        session_id = getc(reader);
+    } else {
+    
+        session_id = -1;
+    }
 }
 
 /**
@@ -89,6 +97,13 @@ void load_cookie() {
 void save_cookie() {
     // TODO: For Part 1.2, write your file operation code here.
     // Hint: The file path of the cookie is stored in COOKIE_PATH.
+    FILE* writer;
+    char* output;
+    writer = fopen(COOKIE_PATH, "w+");
+ //   itoa(session_id, output);
+ //   fputc(session_id, writer);
+    fprintf(writer, "%d", session_id);
+    fclose(writer);
 }
 
 /**
