@@ -245,7 +245,19 @@ void load_all_sessions() {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
     //       Don't forget to load all of sessions on the disk.
-}
+	FILE* reader;
+	int input;
+	char* loc;
+	for (int i = 0; i < NUM_SESSIONS; i++) {
+		get_session_file_path(i, loc);
+		if (reader = fopen(loc, "r")) {
+			for (int j = 0; j < NUM_VARIABLES; j++) {
+				fscanf(reader, "%i", &input);
+				session_list[i].variables[j] = input;
+			}
+		} else {}
+	}		
+}		
 
 /**
  * Saves the given sessions to the disk.
@@ -255,6 +267,15 @@ void load_all_sessions() {
 void save_session(int session_id) {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
+
+	FILE* writer;
+	char* loc;
+	get_session_file_path(session_id, loc);
+	if (writer = fopen(loc, "w+")) {
+		for (int i = 0; i < NUM_VARIABLES; i++) {
+			fprintf(writer, " %i ",session_list[session_id].variables[i]);
+		}
+	} else {}
 }
 
 /**
