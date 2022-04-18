@@ -245,6 +245,7 @@ void load_all_sessions() {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
     //       Don't forget to load all of sessions on the disk.
+	printf("Loading sessions\n");
 	FILE* reader;
 	int input;
 	char* loc;
@@ -256,7 +257,8 @@ void load_all_sessions() {
 				session_list[i].variables[j] = input;
 			}
 		} else {}
-	}		
+	}
+	printf("All sessions loaded\n");
 }		
 
 /**
@@ -331,12 +333,15 @@ int register_browser(int browser_socket_fd) {
  */
 void browser_handler(int browser_socket_fd) {
     int browser_id;
-
+	printf("Handling Browser.\n");
+	pthread_mutex_lock(&browser_list_mutex);
+	printf("Locking\n");
     browser_id = register_browser(browser_socket_fd);
 
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
-
+	printf("Unlocking\n");
+	pthread_mutex_unlock(&browser_list_mutex);
     printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
 
     while (true) {
@@ -344,21 +349,26 @@ void browser_handler(int browser_socket_fd) {
         char response[BUFFER_LEN];
 
         receive_message(socket_fd, message);
-        printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
+       // printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
 
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
-            close(socket_fd);
+            
+        	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
+			close(socket_fd);
             pthread_mutex_lock(&browser_list_mutex);
             browser_list[browser_id].in_use = false;
             pthread_mutex_unlock(&browser_list_mutex);
             printf("Browser #%d exited.\n", browser_id);
+			pthread_exit(NULL);
             return;
         }
 
         if (message[0] == '\0') {
             continue;
         }
-
+		
+		
+    	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
         bool data_valid = process_message(session_id, message);
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
@@ -406,6 +416,9 @@ void start_server(int port) {
     }
     printf("The server is now listening on port %d.\n", port);
 
+
+	pthread_t ptid[NUM_SESSIONS];
+	int cur_sess = 0;
     // Main loop to accept new browsers and creates handlers for them.
     while (true) {
         struct sockaddr_in browser_address;
@@ -417,8 +430,15 @@ void start_server(int port) {
         }
 
         // Starts the handler thread for the new browser.
-        // TODO: For Part 2.1, creat a thread to run browser_handler() here.
-        browser_handler(browser_socket_fd);
+        // TODO: For Part 2.1, creat a thread to run browser_handler() here
+		else {
+			int rc = pthread_create(&ptid[cur_sess++], NULL, (void *) browser_handler, &browser_socket_fd);
+			if (rc) {
+				printf("Error: Unable to create thread, %d\n",rc);
+				exit(-1);
+			}
+		}
+  //      browser_handler(browser_socket_fd);
     }
 
     // Closes the socket.
@@ -434,7 +454,6 @@ void start_server(int port) {
  */
 int main(int argc, char *argv[]) {
     int port = DEFAULT_PORT;
-
     if (argc == 1) {
     } else if ((argc == 3)
                && ((strcmp(argv[1], "--port") == 0) || (strcmp(argv[1], "-p") == 0))) {
