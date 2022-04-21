@@ -66,7 +66,7 @@ void read_user_input(char message[]) {
     fgets(message, BUFFER_LEN, stdin);
     printf("after fgets\n");
     for(int i = 0; i < BUFFER_LEN; i++) {
-        printf(message[i]);
+        printf("%c", message[i]);
     } 
     if (message[strlen(message) - 1] == '\n') {
         message[strlen(message) - 1] = '\0';
@@ -189,7 +189,7 @@ void start_browser(const char host_ip[], int port) {
         char message[BUFFER_LEN];
         read_user_input(message);
         for(int i = 0; i < BUFFER_LEN; i++) {
-            printf(message[i]);
+            printf("%c", message[i]);
         } 
         send_message(server_socket_fd, message);
 

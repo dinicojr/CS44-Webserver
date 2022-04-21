@@ -248,7 +248,7 @@ void load_all_sessions() {
 	printf("Loading sessions\n");
 	FILE* reader;
 	int input;
-	char* loc;
+	char loc[SESSION_PATH_LEN];
 	for (int i = 0; i < NUM_SESSIONS; i++) {
 		get_session_file_path(i, loc);
 		if (reader = fopen(loc, "r")) {
@@ -337,17 +337,18 @@ int register_browser(int browser_socket_fd) {
  */
 void browser_handler(int browser_socket_fd) {
     int browser_id;
-    
+   	printf("Handling Browser"); 
 	browser_id = register_browser(browser_socket_fd);
-
+	pthread_mutex_lock(&browser_list_mutex);	
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
-    
+    pthread_mutex_unlock(&browser_list_mutex);
 	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
 
     while (true) {
-        char message[BUFFER_LEN];
-        char response[BUFFER_LEN];
+
+		char message[BUFFER_LEN];
+		char response[BUFFER_LEN];
 
         receive_message(socket_fd, message);
         printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
@@ -419,7 +420,9 @@ void start_server(int port) {
 
 
 	pthread_t ptid[NUM_SESSIONS];
-    
+   	//pthread_t* ptid = malloc(sizeof(pthread_t) * NUM_SESSIONS);
+
+
 	int cur_sess = 0;
     // Main loop to accept new browsers and creates handlers for them.
     while (true) {
@@ -436,13 +439,18 @@ void start_server(int port) {
         // TODO: For Part 2.1, creat a thread to run browser_handler() here
 		else {
             printf("before rc\n");
-			int rc = pthread_create(&ptid[cur_sess++], NULL, (void *) browser_handler, &browser_socket_fd);
-            printf("after pthread_create rc: %d\n", rc);
-			if (rc) {
-				printf("Error: Unable to create thread, %d\n",rc);
-				exit(-1);
+			if (cur_sess < 128) {
+				printf("%i\n", cur_sess);
+				int rc = pthread_create(&ptid[cur_sess], NULL, (void *) browser_handler, browser_socket_fd);
+            	printf("after pthread_create rc: %d\n", rc);
+				if (rc) {
+					printf("Error: Unable to create thread, %d\n",rc);
+					exit(-1);
+				}
+            	printf("after if\n");
+				pthread_join(ptid[cur_sess], NULL);
+				cur_sess++;
 			}
-            printf("after if\n");
 		}
         //browser_handler(browser_socket_fd);
     }
