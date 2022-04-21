@@ -42,8 +42,13 @@ typedef struct session_struct {
     double values[NUM_VARIABLES];
 } session_t;
 
+struct session_list {
+    struct session_list *next;
+    session_t current_session;
+};
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 // TODO: For Part 3.2, convert the session_list to a simple hashmap/dictionary.
+
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
@@ -176,6 +181,11 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int first_idx = token[0] - 'a';
         first_value = session_list[session_id].values[first_idx];
+        if((first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
+            
+        } else {
+            return false;
+        }
     }
 
     // Processes the operation symbol.
@@ -183,9 +193,14 @@ bool process_message(int session_id, const char message[]) {
     if (token == NULL) {
         session_list[session_id].variables[result_idx] = true;
         session_list[session_id].values[result_idx] = first_value;
+        
         return true;
     }
+
     symbol = token[0];
+    if(symbol != '+' || symbol != '-' || symbol != '*' || symbol != '/' || symbol != '='){
+        return false;
+    }
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
