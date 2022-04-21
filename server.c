@@ -337,9 +337,10 @@ void browser_handler(int browser_socket_fd) {
 	pthread_mutex_lock(&browser_list_mutex);
 	printf("Locking\n");
     browser_id = register_browser(browser_socket_fd);
-
+    printf("line 340 browser id: %d:\n", browser_id);
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
+    printf("line 343 sessionid id: %d:\n", session_id);
 	printf("Unlocking\n");
 	pthread_mutex_unlock(&browser_list_mutex);
     printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
@@ -418,27 +419,32 @@ void start_server(int port) {
 
 
 	pthread_t ptid[NUM_SESSIONS];
+    
 	int cur_sess = 0;
     // Main loop to accept new browsers and creates handlers for them.
     while (true) {
         struct sockaddr_in browser_address;
         socklen_t browser_address_len = sizeof(browser_address);
+        printf("after len\n");
         int browser_socket_fd = accept(server_socket_fd, (struct sockaddr *) &browser_address, &browser_address_len);
+        printf("after browser_socket_fd: %d\n", browser_socket_fd);
         if ((browser_socket_fd) < 0) {
             perror("Socket accept failed");
             continue;
         }
-
         // Starts the handler thread for the new browser.
         // TODO: For Part 2.1, creat a thread to run browser_handler() here
 		else {
+            printf("before rc\n");
 			int rc = pthread_create(&ptid[cur_sess++], NULL, (void *) browser_handler, &browser_socket_fd);
+            printf("after pthread_create rc: %d\n", rc);
 			if (rc) {
 				printf("Error: Unable to create thread, %d\n",rc);
 				exit(-1);
 			}
+            printf("after if\n");
 		}
-  //      browser_handler(browser_socket_fd);
+        //browser_handler(browser_socket_fd);
     }
 
     // Closes the socket.
