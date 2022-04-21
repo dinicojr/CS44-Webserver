@@ -388,11 +388,14 @@ void browser_handler(int browser_socket_fd) {
         bool data_valid = process_message(session_id, message);
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
+            broadcast(session_id, "false");
             continue;
+        }else{
+            session_to_str(session_id, response);
+            broadcast(session_id, response);
         }
 
-        session_to_str(session_id, response);
-        broadcast(session_id, response);
+        
 
         save_session(session_id);
     }

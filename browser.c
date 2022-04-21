@@ -131,6 +131,10 @@ void server_listener() {
     receive_message(server_socket_fd, message);
 
     // TODO: For Part 3.1, add code here to print the error message.
+    if(message == "false"){
+        printf("ERROR:\n Commands must follow syntax as follows:\n x = y\n x = 1 + 2\n x = y - 1\n x = 1 * y\nx = y / z\n");
+    }
+    
 
     puts(message);
 
