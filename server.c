@@ -276,6 +276,7 @@ void load_all_sessions() {
 				pthread_mutex_lock(&session_list_mutex);
 				session_list[i].variables[j] = input;
 				pthread_mutex_unlock(&session_list_mutex);
+				fclose(reader);
 			}
 		} else {}
 	}
@@ -293,12 +294,14 @@ void save_session(int session_id) {
 
 	FILE* writer;
 	char loc[SESSION_PATH_LEN];
+	pthread_mutex_lock(&session_list_mutex);
+	struct session_struct current = session_list[session_id];
+	pthread_mutex_unlock(&session_list_mutex);
 	get_session_file_path(session_id, loc);
 	if (writer = fopen(loc, "w+")) {
-		for (int i = 0; i < NUM_VARIABLES; i++) {
-			fprintf(writer, " %i ",session_list[session_id].variables[i]);
-		}
-	} else {}
+		fwrite(&current, sizeof(struct session_struct), 1, writer);
+		fclose(writer);
+	}
 }
 
 /**
@@ -320,6 +323,7 @@ int register_browser(int browser_socket_fd) {
             browser_id = i;
             browser_list[browser_id].in_use = true;
             browser_list[browser_id].socket_fd = browser_socket_fd;
+			pthread_mutex_unlock(&browser_list_mutex);
             break;
         }
 		
@@ -333,15 +337,17 @@ int register_browser(int browser_socket_fd) {
     
 	if (session_id == -1) {
 
-		pthread_mutex_lock(&browser_list_mutex);
         for (int i = 0; i < NUM_SESSIONS; ++i) {
             if (!session_list[i].in_use) {
+
+				pthread_mutex_lock(&browser_list_mutex);
                 session_id = i;
                 session_list[session_id].in_use = true; 
-                break;
+                pthread_mutex_unlock(&browser_list_mutex);
+				break;
             }
+			pthread_mutex_unlock(&browser_list_mutex);
         }
-		pthread_mutex_unlock(&browser_list_mutex);
 
     }
 	pthread_mutex_lock(&browser_list_mutex);
@@ -383,9 +389,9 @@ void browser_handler(int browser_socket_fd) {
 
         receive_message(socket_fd, message);
 
-		if (strcmp(message, "")) {
-	    	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
-		}
+//		if (strcmp(message, "")) {
+//	    	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
+//		}
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
             
         	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
@@ -394,7 +400,7 @@ void browser_handler(int browser_socket_fd) {
             browser_list[browser_id].in_use = false;
             pthread_mutex_unlock(&browser_list_mutex);
             printf("Browser #%d exited.\n", browser_id);
-			pthread_exit(NULL);
+//			pthread_exit(NULL);
             return;
         }
 
@@ -403,7 +409,7 @@ void browser_handler(int browser_socket_fd) {
         }
 		
 		
-    	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
+//    	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
         bool data_valid = process_message(session_id, message);
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
@@ -481,12 +487,17 @@ void start_server(int port) {
 					exit(-1);
 				}
             	printf("after if\n");
-				pthread_join(ptid[cur_sess], NULL);
+//				pthread_join(ptid[cur_sess], NULL);
 				cur_sess++;
 			}
 		}
         //browser_handler(browser_socket_fd);
     }
+
+
+	for (int i = 0; i < cur_sess; i++) {
+		pthread_join(ptid[i], NULL);
+	}
 
     // Closes the socket.
     close(server_socket_fd);

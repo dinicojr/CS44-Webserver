@@ -65,9 +65,9 @@ void read_user_input(char message[]) {
     printf("before fgets\n");
     fgets(message, BUFFER_LEN, stdin);
     printf("after fgets\n");
-    for(int i = 0; i < BUFFER_LEN; i++) {
-        printf("%c", message[i]);
-    } 
+   // for(int i = 0; i < BUFFER_LEN; i++) {
+   //     printf("%c", message[i]);
+   //	 } 
     if (message[strlen(message) - 1] == '\n') {
         message[strlen(message) - 1] = '\0';
     }
@@ -88,7 +88,7 @@ void load_cookie() {
     FILE *reader;
     
     if (reader = fopen(COOKIE_PATH, "r")) {
-        session_id = getc(reader);
+        fscanf(reader, "%d", &session_id);
     } else {
         printf("load else");
         session_id = -1;
@@ -125,6 +125,10 @@ void register_server() {
     printf("reg server func after session id set\n");
 }
 
+void* server_listener_starter(void* arg) {
+	server_listener();
+}
+
 /**
  * Listens to the server; keeps receiving and printing the messages from the server.
  */
@@ -132,24 +136,27 @@ void server_listener() {
     // TODO: For Part 2.3, uncomment the loop code that was commented out
     //  when you are done with multithreading.
 
-    // while (browser_on) {
+    while (browser_on) {
 
-    char message[BUFFER_LEN];
-    receive_message(server_socket_fd, message);
-    
-    
+    	char message[BUFFER_LEN];
+    	receive_message(server_socket_fd, message);
+
+		if (!strncmp(message, "ERROR", 5)) {
+			strcpy(message, "Invalid Input!\n");
+		}
+      
 
     // TODO: For Part 3.1, add code here to print the error message.
-    if (message == "false") {
-        printf("ERROR:\n Commands must follow syntax as follows:\n x = y\n x = 1 + 2\n x = y - 1\n x = 1 * y\nx = y / z\n");
-    } else if (message == "STARTUP") {
-		puts("Starting up!");	
-	}
+//    if (message == "false") {
+//        printf("ERROR:\n Commands must follow syntax as follows:\n x = y\n x = 1 + 2\n x = y - 1\n x = 1 * y\nx = y / z\n");
+//    } else if (message == "STARTUP") {
+//		puts("Starting up!");	
+//	}
     
 
     puts(message);
 
-    //}
+    }
 }
 
 /**
@@ -166,7 +173,7 @@ void start_browser(const char host_ip[], int port) {
     // Creates the socket.
     server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket_fd < 0) {
-        printf("in error line 154");
+//        printf("in error line 154");
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -190,21 +197,25 @@ void start_browser(const char host_ip[], int port) {
     // Saves the session ID to the cookie on the disk.
     save_cookie();
 	printf("Browser on: %s", browser_on ? "true" : "false");
+
+	pthread_t listener_id;
+	pthread_create(&listener_id, NULL, server_listener_starter, NULL);
     // Main loop to read in the user's input and send it out.
     while (browser_on) {
         char message[BUFFER_LEN];
         read_user_input(message);
-        for(int i = 0; i < BUFFER_LEN; i++) {
-            printf("%c", message[i]);
-        } 
+//      for(int i = 0; i < BUFFER_LEN; i++) {
+//          printf("%c", message[i]);
+//      } 
         send_message(server_socket_fd, message);
 
         // Starts the listener thread.
         // TODO: For Part 2.3, move server_listener() out of the loop and
         //  creat a thread to run it.
         // Hint: Should we place server_listener() before or after the loop?
-        server_listener();
     }
+
+	pthread_join(listener_id, NULL);
 
     // Closes the socket.
     close(server_socket_fd);
