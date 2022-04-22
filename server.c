@@ -29,6 +29,7 @@
 #define NUM_BROWSER 128
 #define DATA_DIR "./sessions"
 #define SESSION_PATH_LEN 128
+#define HASH_SIZE 128
 
 typedef struct browser_struct {
     bool in_use;
@@ -236,9 +237,12 @@ bool process_message(int session_id, const char message[]) {
  * @param message the message to be broadcasted
  */
 void broadcast(int session_id, const char message[]) {
+	printf("BROADCASTING\n");
     for (int i = 0; i < NUM_BROWSER; ++i) {
         if (browser_list[i].in_use && browser_list[i].session_id == session_id) {
+			pthread_mutex_lock(&browser_list_mutex);
             send_message(browser_list[i].socket_fd, message);
+			pthread_mutex_unlock(&browser_list_mutex);
         }
     }
 }
@@ -269,7 +273,9 @@ void load_all_sessions() {
 		if (reader = fopen(loc, "r")) {
 			for (int j = 0; j < NUM_VARIABLES; j++) {
 				fscanf(reader, "%i", &input);
+				pthread_mutex_lock(&session_list_mutex);
 				session_list[i].variables[j] = input;
+				pthread_mutex_unlock(&session_list_mutex);
 			}
 		} else {}
 	}
@@ -286,7 +292,7 @@ void save_session(int session_id) {
     // Hint: Use get_session_file_path() to get the file path for each session.
 
 	FILE* writer;
-	char* loc;
+	char loc[SESSION_PATH_LEN];
 	get_session_file_path(session_id, loc);
 	if (writer = fopen(loc, "w+")) {
 		for (int i = 0; i < NUM_VARIABLES; i++) {
@@ -308,32 +314,37 @@ int register_browser(int browser_socket_fd) {
     // TODO: For Part 2.2, identify the critical sections where different threads may read from/write to
     //  the same shared static array browser_list and session_list. Place the lock and unlock
     //  code around the critical sections identified.
-    pthread_mutex_lock(&browser_list_mutex);
     for (int i = 0; i < NUM_BROWSER; ++i) {
+    	pthread_mutex_lock(&browser_list_mutex);
         if (!browser_list[i].in_use) {
             browser_id = i;
             browser_list[browser_id].in_use = true;
             browser_list[browser_id].socket_fd = browser_socket_fd;
             break;
         }
+		
+    	pthread_mutex_unlock(&browser_list_mutex);
     }
-    pthread_mutex_unlock(&browser_list_mutex);
 
     char message[BUFFER_LEN];
     receive_message(browser_socket_fd, message);
 
     int session_id = strtol(message, NULL, 10);
     
-    pthread_mutex_lock(&browser_list_mutex);
-    if (session_id == -1) {
+	if (session_id == -1) {
+
+		pthread_mutex_lock(&browser_list_mutex);
         for (int i = 0; i < NUM_SESSIONS; ++i) {
             if (!session_list[i].in_use) {
                 session_id = i;
-                session_list[session_id].in_use = true;
+                session_list[session_id].in_use = true; 
                 break;
             }
         }
+		pthread_mutex_unlock(&browser_list_mutex);
+
     }
+	pthread_mutex_lock(&browser_list_mutex);
     browser_list[browser_id].session_id = session_id;
     pthread_mutex_unlock(&browser_list_mutex);
 
@@ -354,11 +365,16 @@ void browser_handler(int browser_socket_fd) {
     int browser_id;
    	printf("Handling Browser"); 
 	browser_id = register_browser(browser_socket_fd);
+
 	pthread_mutex_lock(&browser_list_mutex);	
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
     pthread_mutex_unlock(&browser_list_mutex);
+	
 	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
+	broadcast(session_id, "STARTUP");
+
+	printf("Broadcast!");
 
     while (true) {
 
@@ -366,8 +382,10 @@ void browser_handler(int browser_socket_fd) {
 		char response[BUFFER_LEN];
 
         receive_message(socket_fd, message);
-        printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
 
+		if (strcmp(message, "")) {
+	    	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
+		}
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
             
         	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
@@ -391,13 +409,9 @@ void browser_handler(int browser_socket_fd) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
             broadcast(session_id, "false");
             continue;
-        }else{
-            session_to_str(session_id, response);
-            broadcast(session_id, response);
         }
-
-        
-
+        session_to_str(session_id, response);
+        broadcast(session_id, response);
         save_session(session_id);
     }
 }
@@ -424,6 +438,7 @@ void start_server(int port) {
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
     server_address.sin_port = htons(port);
+	setsockopt(server_socket_fd, SOL_SOCKET, SO_REUSEADDR, (void *) 1, sizeof(int));
     if (bind(server_socket_fd, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
         perror("Socket bind failed");
         exit(EXIT_FAILURE);
@@ -459,7 +474,7 @@ void start_server(int port) {
             printf("before rc\n");
 			if (cur_sess < 128) {
 				printf("%i\n", cur_sess);
-				int rc = pthread_create(&ptid[cur_sess], NULL, (void *) browser_handler, browser_socket_fd);
+				int rc = pthread_create(&ptid[cur_sess], NULL, (void *) browser_handler, &browser_socket_fd);
             	printf("after pthread_create rc: %d\n", rc);
 				if (rc) {
 					printf("Error: Unable to create thread, %d\n",rc);

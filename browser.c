@@ -117,7 +117,7 @@ void register_server() {
     char message[BUFFER_LEN];
     sprintf(message, "%d", session_id);
     printf("reg server func after sprintf\n");
-    (server_socket_fd, message);
+    send_message(server_socket_fd, message);
     printf("reg server func after pair\n");
     receive_message(server_socket_fd, message);
     printf("reg server func after receive message func\n");
@@ -140,9 +140,11 @@ void server_listener() {
     
 
     // TODO: For Part 3.1, add code here to print the error message.
-    if(message == "false"){
+    if (message == "false") {
         printf("ERROR:\n Commands must follow syntax as follows:\n x = y\n x = 1 + 2\n x = y - 1\n x = 1 * y\nx = y / z\n");
-    }
+    } else if (message == "STARTUP") {
+		puts("Starting up!");	
+	}
     
 
     puts(message);
@@ -187,7 +189,7 @@ void start_browser(const char host_ip[], int port) {
 
     // Saves the session ID to the cookie on the disk.
     save_cookie();
-
+	printf("Browser on: %s", browser_on ? "true" : "false");
     // Main loop to read in the user's input and send it out.
     while (browser_on) {
         char message[BUFFER_LEN];
