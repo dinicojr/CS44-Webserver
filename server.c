@@ -48,8 +48,20 @@ struct session_list {
 };
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 // TODO: For Part 3.2, convert the session_list to a simple hashmap/dictionary.
+typedef struct entry_struct {
+    session_t* session; //data
+    int key; //key
+    struct entry_struct* collision;
+} hash_entry_t;
+
+typedef struct hashmap_struct {
+    hash_entry_t *entries; //data
+} hashmap_t;
+
 
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
+
+hashmap_t* m = (hashmap_t*) malloc(sizeof(hashmap_t));
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
 
