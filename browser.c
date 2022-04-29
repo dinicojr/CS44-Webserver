@@ -62,12 +62,8 @@ void start_browser(const char host_ip[], int port);
  * @param message an array to store the user input
  */
 void read_user_input(char message[]) {
-    printf("before fgets\n");
     fgets(message, BUFFER_LEN, stdin);
-    printf("after fgets\n");
-    for(int i = 0; i < BUFFER_LEN; i++) {
-        printf("%c", message[i]);
-    } 
+
     if (message[strlen(message) - 1] == '\n') {
         message[strlen(message) - 1] = '\0';
     }
@@ -84,15 +80,7 @@ void read_user_input(char message[]) {
 void load_cookie() {
     // TODO: For Part 1.2, write your file operation code here.
     // Hint: The file path of the cookie is stored in COOKIE_PATH.
-    
-    FILE *reader;
-    
-    if (reader = fopen(COOKIE_PATH, "r")) {
-        session_id = getc(reader);
-    } else {
-        printf("load else");
-        session_id = -1;
-    }
+    session_id = -1; // You may move this line to anywhere inside this fucntion.
 }
 
 /**
@@ -101,13 +89,6 @@ void load_cookie() {
 void save_cookie() {
     // TODO: For Part 1.2, write your file operation code here.
     // Hint: The file path of the cookie is stored in COOKIE_PATH.
-    FILE* writer;
-    char* output;
-    writer = fopen(COOKIE_PATH, "w+");
- //   itoa(session_id, output);
- //   fputc(session_id, writer);
-    fprintf(writer, "%d", session_id);
-    fclose(writer);
 }
 
 /**
@@ -116,13 +97,10 @@ void save_cookie() {
 void register_server() {
     char message[BUFFER_LEN];
     sprintf(message, "%d", session_id);
-    printf("reg server func after sprintf\n");
-    (server_socket_fd, message);
-    printf("reg server func after pair\n");
+    send_message(server_socket_fd, message);
+
     receive_message(server_socket_fd, message);
-    printf("reg server func after receive message func\n");
     session_id = strtol(message, NULL, 10);
-    printf("reg server func after session id set\n");
 }
 
 /**
@@ -136,14 +114,8 @@ void server_listener() {
 
     char message[BUFFER_LEN];
     receive_message(server_socket_fd, message);
-    
-    
 
     // TODO: For Part 3.1, add code here to print the error message.
-    if(message == "false"){
-        printf("ERROR:\n Commands must follow syntax as follows:\n x = y\n x = 1 + 2\n x = y - 1\n x = 1 * y\nx = y / z\n");
-    }
-    
 
     puts(message);
 
@@ -164,7 +136,6 @@ void start_browser(const char host_ip[], int port) {
     // Creates the socket.
     server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket_fd < 0) {
-        printf("in error line 154");
         perror("Socket creation failed");
         exit(EXIT_FAILURE);
     }
@@ -192,9 +163,6 @@ void start_browser(const char host_ip[], int port) {
     while (browser_on) {
         char message[BUFFER_LEN];
         read_user_input(message);
-        for(int i = 0; i < BUFFER_LEN; i++) {
-            printf("%c", message[i]);
-        } 
         send_message(server_socket_fd, message);
 
         // Starts the listener thread.
@@ -219,42 +187,34 @@ void start_browser(const char host_ip[], int port) {
 int main(int argc, char *argv[]) {
     char *host_ip = DEFAULT_HOST_IP;
     int port = DEFAULT_PORT;
-    printf("pre if");
+
     if (argc == 1) {
-        printf("argc == 1");
     } else if ((argc == 3)
                && ((strcmp(argv[1], "--host") == 0) || (strcmp(argv[1], "-h") == 0))) {
-        printf("arg == 3, -h");
         host_ip = argv[2];
 
     } else if ((argc == 3)
                && ((strcmp(argv[1], "--port") == 0) || (strcmp(argv[1], "-p") == 0))) {
-        printf("arg == 3, -p\n");
         port = strtol(argv[2], NULL, 10);
 
     } else if ((argc == 5)
                && ((strcmp(argv[1], "--host") == 0) || (strcmp(argv[1], "-h") == 0))
                && ((strcmp(argv[3], "--port") == 0) || (strcmp(argv[3], "-p") == 0))) {
-        printf("argc == 5");
         host_ip = argv[2];
         port = strtol(argv[4], NULL, 10);
 
     } else {
-        printf("else");
         puts("Invalid arguments.");
         exit(EXIT_FAILURE);
     }
 
     if (port < 1024) {
         puts("Invalid port.");
-        printf("in port");
         exit(EXIT_FAILURE);
     }
 
     // Starts the browser using the given host IP and port
-    printf("start");
     start_browser(host_ip, port);
-    printf("after start");
+
     exit(EXIT_SUCCESS);
-    printf("after exit");
 }

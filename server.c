@@ -42,13 +42,8 @@ typedef struct session_struct {
     double values[NUM_VARIABLES];
 } session_t;
 
-struct session_list {
-    struct session_list *next;
-    session_t current_session;
-};
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 // TODO: For Part 3.2, convert the session_list to a simple hashmap/dictionary.
-
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
@@ -181,11 +176,6 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int first_idx = token[0] - 'a';
         first_value = session_list[session_id].values[first_idx];
-        if((first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
-            
-        } else {
-            return false;
-        }
     }
 
     // Processes the operation symbol.
@@ -193,14 +183,9 @@ bool process_message(int session_id, const char message[]) {
     if (token == NULL) {
         session_list[session_id].variables[result_idx] = true;
         session_list[session_id].values[result_idx] = first_value;
-        
         return true;
     }
-
     symbol = token[0];
-    if(symbol != '+' || symbol != '-' || symbol != '*' || symbol != '/' || symbol != '='){
-        return false;
-    }
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
@@ -260,21 +245,7 @@ void load_all_sessions() {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
     //       Don't forget to load all of sessions on the disk.
-	printf("Loading sessions\n");
-	FILE* reader;
-	int input;
-	char loc[SESSION_PATH_LEN];
-	for (int i = 0; i < NUM_SESSIONS; i++) {
-		get_session_file_path(i, loc);
-		if (reader = fopen(loc, "r")) {
-			for (int j = 0; j < NUM_VARIABLES; j++) {
-				fscanf(reader, "%i", &input);
-				session_list[i].variables[j] = input;
-			}
-		} else {}
-	}
-	printf("All sessions loaded\n");
-}		
+}
 
 /**
  * Saves the given sessions to the disk.
@@ -284,15 +255,6 @@ void load_all_sessions() {
 void save_session(int session_id) {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
-
-	FILE* writer;
-	char* loc;
-	get_session_file_path(session_id, loc);
-	if (writer = fopen(loc, "w+")) {
-		for (int i = 0; i < NUM_VARIABLES; i++) {
-			fprintf(writer, " %i ",session_list[session_id].variables[i]);
-		}
-	} else {}
 }
 
 /**
@@ -308,7 +270,7 @@ int register_browser(int browser_socket_fd) {
     // TODO: For Part 2.2, identify the critical sections where different threads may read from/write to
     //  the same shared static array browser_list and session_list. Place the lock and unlock
     //  code around the critical sections identified.
-    pthread_mutex_lock(&browser_list_mutex);
+
     for (int i = 0; i < NUM_BROWSER; ++i) {
         if (!browser_list[i].in_use) {
             browser_id = i;
@@ -317,14 +279,11 @@ int register_browser(int browser_socket_fd) {
             break;
         }
     }
-    pthread_mutex_unlock(&browser_list_mutex);
 
     char message[BUFFER_LEN];
     receive_message(browser_socket_fd, message);
 
     int session_id = strtol(message, NULL, 10);
-    
-    pthread_mutex_lock(&browser_list_mutex);
     if (session_id == -1) {
         for (int i = 0; i < NUM_SESSIONS; ++i) {
             if (!session_list[i].in_use) {
@@ -335,7 +294,6 @@ int register_browser(int browser_socket_fd) {
         }
     }
     browser_list[browser_id].session_id = session_id;
-    pthread_mutex_unlock(&browser_list_mutex);
 
     sprintf(message, "%d", session_id);
     send_message(browser_socket_fd, message);
@@ -352,51 +310,42 @@ int register_browser(int browser_socket_fd) {
  */
 void browser_handler(int browser_socket_fd) {
     int browser_id;
-   	printf("Handling Browser"); 
-	browser_id = register_browser(browser_socket_fd);
-	pthread_mutex_lock(&browser_list_mutex);	
+
+    browser_id = register_browser(browser_socket_fd);
+
     int socket_fd = browser_list[browser_id].socket_fd;
     int session_id = browser_list[browser_id].session_id;
-    pthread_mutex_unlock(&browser_list_mutex);
-	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
+
+    printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
 
     while (true) {
-
-		char message[BUFFER_LEN];
-		char response[BUFFER_LEN];
+        char message[BUFFER_LEN];
+        char response[BUFFER_LEN];
 
         receive_message(socket_fd, message);
         printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
 
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
-            
-        	printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
-			close(socket_fd);
+            close(socket_fd);
             pthread_mutex_lock(&browser_list_mutex);
             browser_list[browser_id].in_use = false;
             pthread_mutex_unlock(&browser_list_mutex);
             printf("Browser #%d exited.\n", browser_id);
-			pthread_exit(NULL);
             return;
         }
 
         if (message[0] == '\0') {
             continue;
         }
-		
-		
-    	printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
+
         bool data_valid = process_message(session_id, message);
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
-            broadcast(session_id, "false");
             continue;
-        }else{
-            session_to_str(session_id, response);
-            broadcast(session_id, response);
         }
 
-        
+        session_to_str(session_id, response);
+        broadcast(session_id, response);
 
         save_session(session_id);
     }
@@ -415,8 +364,8 @@ void start_server(int port) {
     // Creates the socket.
     int server_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket_fd == 0) {
-    	perror("Socket creation failed");
-    	exit(EXIT_FAILURE);
+        perror("Socket creation failed");
+        exit(EXIT_FAILURE);
     }
 
     // Binds the socket.
@@ -436,41 +385,19 @@ void start_server(int port) {
     }
     printf("The server is now listening on port %d.\n", port);
 
-
-	pthread_t ptid[NUM_SESSIONS];
-   	//pthread_t* ptid = malloc(sizeof(pthread_t) * NUM_SESSIONS);
-
-
-	int cur_sess = 0;
     // Main loop to accept new browsers and creates handlers for them.
     while (true) {
         struct sockaddr_in browser_address;
         socklen_t browser_address_len = sizeof(browser_address);
-        printf("after len\n");
         int browser_socket_fd = accept(server_socket_fd, (struct sockaddr *) &browser_address, &browser_address_len);
-        printf("after browser_socket_fd: %d\n", browser_socket_fd);
         if ((browser_socket_fd) < 0) {
             perror("Socket accept failed");
             continue;
         }
+
         // Starts the handler thread for the new browser.
-        // TODO: For Part 2.1, creat a thread to run browser_handler() here
-		else {
-            printf("before rc\n");
-			if (cur_sess < 128) {
-				printf("%i\n", cur_sess);
-				int rc = pthread_create(&ptid[cur_sess], NULL, (void *) browser_handler, browser_socket_fd);
-            	printf("after pthread_create rc: %d\n", rc);
-				if (rc) {
-					printf("Error: Unable to create thread, %d\n",rc);
-					exit(-1);
-				}
-            	printf("after if\n");
-				pthread_join(ptid[cur_sess], NULL);
-				cur_sess++;
-			}
-		}
-        //browser_handler(browser_socket_fd);
+        // TODO: For Part 2.1, creat a thread to run browser_handler() here.
+        browser_handler(browser_socket_fd);
     }
 
     // Closes the socket.
@@ -486,6 +413,7 @@ void start_server(int port) {
  */
 int main(int argc, char *argv[]) {
     int port = DEFAULT_PORT;
+
     if (argc == 1) {
     } else if ((argc == 3)
                && ((strcmp(argv[1], "--port") == 0) || (strcmp(argv[1], "-p") == 0))) {
