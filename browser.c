@@ -84,7 +84,7 @@ void load_cookie() {
 
 	if( reader = fopen(COOKIE_PATH, "r")){
 		fscanf(reader, "%d", &session_id);
-	} ekse {
+	} else {
 		session_id = -1;
 	}
 }
@@ -98,8 +98,8 @@ void save_cookie() {
 	FILE *writer;
 	char* output;
 
-	writer = fopen(COOKIE_PATH, "W");
-	fprintf(reader, "%d", &session_id);
+	writer = fopen(COOKIE_PATH, "w");
+	fprintf(writer, "%d", session_id);
 	fclose(writer);
 
 }
@@ -123,16 +123,16 @@ void server_listener() {
     // TODO: For Part 2.3, uncomment the loop code that was commented out
     //  when you are done with multithreading.
 
-    // while (browser_on) {
+    while (browser_on) {
 
-    char message[BUFFER_LEN];
-    receive_message(server_socket_fd, message);
+    	char message[BUFFER_LEN];
+    	receive_message(server_socket_fd, message);
 
     // TODO: For Part 3.1, add code here to print the error message.
 
-    puts(message);
+    	puts(message);
 
-    //}
+   }
 }
 
 /**
@@ -173,6 +173,10 @@ void start_browser(const char host_ip[], int port) {
     save_cookie();
 
     // Main loop to read in the user's input and send it out.
+	
+	pthread_t thread_id;
+	pthread_create(&thread_id, NULL, (void *) server_listener, NULL);
+
     while (browser_on) {
         char message[BUFFER_LEN];
         read_user_input(message);
@@ -182,7 +186,7 @@ void start_browser(const char host_ip[], int port) {
         // TODO: For Part 2.3, move server_listener() out of the loop and
         //  creat a thread to run it.
         // Hint: Should we place server_listener() before or after the loop?
-        server_listener();
+//        server_listener();
     }
 
     // Closes the socket.

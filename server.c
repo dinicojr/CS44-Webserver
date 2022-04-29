@@ -296,12 +296,16 @@ int register_browser(int browser_socket_fd) {
     //  code around the critical sections identified.
 
     for (int i = 0; i < NUM_BROWSER; ++i) {
-        if (!browser_list[i].in_use) {
+        	
+		pthread_mutex_lock(&browser_list_mutex);
+		if (!browser_list[i].in_use) {
             browser_id = i;
             browser_list[browser_id].in_use = true;
             browser_list[browser_id].socket_fd = browser_socket_fd;
+			pthread_mutex_unlock(&browser_list_mutex);
             break;
         }
+		pthread_mutex_unlock(&browser_list_mutex);
     }
 
     char message[BUFFER_LEN];
@@ -310,11 +314,14 @@ int register_browser(int browser_socket_fd) {
     int session_id = strtol(message, NULL, 10);
     if (session_id == -1) {
         for (int i = 0; i < NUM_SESSIONS; ++i) {
+			pthread_mutex_lock(&session_list_mutex);
             if (!session_list[i].in_use) {
                 session_id = i;
                 session_list[session_id].in_use = true;
+				pthread_mutex_unlock(&session_list_mutex);	
                 break;
             }
+			pthread_mutex_unlock(&session_list_mutex);	
         }
     }
     browser_list[browser_id].session_id = session_id;
@@ -345,7 +352,10 @@ void browser_handler(int browser_socket_fd) {
     while (true) {
         char message[BUFFER_LEN];
         char response[BUFFER_LEN];
-
+	
+        if (message[0] == '\0') {
+            continue;
+        }
         receive_message(socket_fd, message);
         printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
 
@@ -414,15 +424,18 @@ void start_server(int port) {
     while (true) {
         struct sockaddr_in browser_address;
         socklen_t browser_address_len = sizeof(browser_address);
-        int browser_socket_fd = accept(server_socket_fd, (struct sockaddr *) &browser_address, &browser_address_len);
+		int browser_socket_fd = accept(server_socket_fd, (struct sockaddr *) &browser_address, &browser_address_len);
         if ((browser_socket_fd) < 0) {
             perror("Socket accept failed");
             continue;
         }
 
         // Starts the handler thread for the new browser.
-        // TODO: For Part 2.1, creat a thread to run browser_handler() here.
-        browser_handler(browser_socket_fd);
+        // TODO: For Part 2.1, create a thread to run browser_handler() here.
+		pthread_t thread_id;
+		pthread_create(&thread_id, NULL, (void *) browser_handler, (void *) &browser_socket_fd);
+		pthread_join(thread_id, NULL);
+	//	browser_handler(browser_socket_fd);
     }
 
     // Closes the socket.
