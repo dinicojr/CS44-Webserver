@@ -245,6 +245,21 @@ void load_all_sessions() {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
     //       Don't forget to load all of sessions on the disk.
+	
+	FILE *fp;
+	char path[SESSION_PATH_LEN];
+
+	for (int i = 0; i < NUM_SESSIONS; i++) {
+		get_session_file_path(i, path);
+		
+		int s_id = -1;
+		sscanf(path, "./sessions/session%d.dat", &s_id);
+
+		if (fp = fopen(path, "r")) {
+			fread(&session_list[i], sizeof(struct session_struct), 1, fp);
+			fclose(fp);
+		}
+	}
 }
 
 /**
@@ -255,6 +270,15 @@ void load_all_sessions() {
 void save_session(int session_id) {
     // TODO: For Part 1.1, write your file operation code here.
     // Hint: Use get_session_file_path() to get the file path for each session.
+	
+	FILE* fp;
+	char path[SESSION_PATH_LEN];
+	struct session_struct current = session_list[session_id];
+	
+	get_session_file_path(session_id, path);
+	fp = fopen(path, "w");
+	fwrite(&current, sizeof(struct session_struct), 1, fp);
+	fclose(fp);
 }
 
 /**
