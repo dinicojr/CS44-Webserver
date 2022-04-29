@@ -397,6 +397,7 @@ void start_server(int port) {
     server_address.sin_family = AF_INET;
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
     server_address.sin_port = htons(port);
+	setsockopt(server_socket_fd, SOL_SOCKET, SO_REUSEADDR, (void *) 1, sizeof(int));
     if (bind(server_socket_fd, (struct sockaddr *) &server_address, sizeof(server_address)) < 0) {
         perror("Socket bind failed");
         exit(EXIT_FAILURE);
