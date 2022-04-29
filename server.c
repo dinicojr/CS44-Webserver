@@ -193,10 +193,10 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int first_idx = token[0] - 'a';
         first_value = session_list[session_id].values[first_idx];
-        if((first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
-            
-        } else {
+        if(!(first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
             return false;
+        }else if (first_value >= 'A' && first_value <= 'Z'){
+            first_value = islower(first_value);
         }
     }
 
@@ -210,17 +210,22 @@ bool process_message(int session_id, const char message[]) {
     }
 
     symbol = token[0];
-    if(symbol != '+' || symbol != '-' || symbol != '*' || symbol != '/' || symbol != '='){
+    if(symbol != '+' || symbol != '-' || symbol != '*' || symbol != '/'){
         return false;
     }
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
     if (is_str_numeric(token)) {
-        second_value = strtod(token, NULL);
+        first_value = strtod(token, NULL);
     } else {
-        int second_idx = token[0] - 'a';
-        second_value = session_list[session_id].values[second_idx];
+        int first_idx = token[0] - 'a';
+        first_value = session_list[session_id].values[first_idx];
+        if(!(first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
+            return false;
+        }else if (first_value >= 'A' && first_value <= 'Z'){
+            first_value = islower(first_value);
+        }
     }
 
     // No data should be left over thereafter.
