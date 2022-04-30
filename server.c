@@ -45,7 +45,20 @@ typedef struct session_struct {
 
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 // TODO: For Part 3.2, convert the session_list to a simple hashmap/dictionary.
+typedef struct entry_struct {
+    session_t* session; //data
+    int key; //key
+    struct entry_struct* collision;
+} hash_entry_t;
+
+typedef struct hashmap_struct {
+    hash_entry_t *entries; //data
+} hashmap_t;
+
+
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
+
+hashmap_t* m = (hashmap_t*) malloc(sizeof(hashmap_t));
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
 
@@ -178,6 +191,12 @@ bool process_message(int session_id, const char message[]) {
     } else {
         int first_idx = token[0] - 'a';
         first_value = session_list[session_id].values[first_idx];
+        
+		if (!(first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
+            return false;
+        }else if (first_value >= 'A' && first_value <= 'Z'){
+            first_value = islower(first_value);
+        }
     }
 
     // Processes the operation symbol.
@@ -188,14 +207,23 @@ bool process_message(int session_id, const char message[]) {
         return true;
     }
     symbol = token[0];
+    if (symbol != '+' || symbol != '-' || symbol != '*' || symbol != '/'){
+		
+        return false;
+    }
 
     // Processes the second variable/value.
     token = strtok(NULL, " ");
     if (is_str_numeric(token)) {
-        second_value = strtod(token, NULL);
+        first_value = strtod(token, NULL);
     } else {
-        int second_idx = token[0] - 'a';
-        second_value = session_list[session_id].values[second_idx];
+        int first_idx = token[0] - 'a';
+        first_value = session_list[session_id].values[first_idx];
+        if(!(first_value >= 'a' && first_value <= 'z') || (first_value >= 'A' && first_value <= 'Z')){
+            return false;
+        }else if (first_value >= 'A' && first_value <= 'Z'){
+            first_value = islower(first_value);
+        }
     }
 
     // No data should be left over thereafter.
