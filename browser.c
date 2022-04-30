@@ -108,10 +108,14 @@ void save_cookie() {
  * Interacts with the server to get or confirm the final session ID.
  */
 void register_server() {
+	//printf("Session\n");
+	printf("Session: %i\n", session_id);
     char message[BUFFER_LEN];
+	message;
     sprintf(message, "%d", session_id);
+	printf("%s\n", message);
     send_message(server_socket_fd, message);
-
+	printf("sent message!\n");
     receive_message(server_socket_fd, message);
     session_id = strtol(message, NULL, 10);
 }

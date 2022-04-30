@@ -23,6 +23,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <netinet/in.h>
+#include <stdint.h>
 
 #define NUM_VARIABLES 26
 #define NUM_SESSIONS 128
@@ -79,7 +80,7 @@ int register_browser(int browser_socket_fd);
 // processing the message received,
 // broadcasting the update to all browsers with the same session ID,
 // and backing up the session on the disk.
-void browser_handler(int browser_socket_fd);
+void browser_handler(void* browser_socket_fd);
 
 // Starts the server.
 // Sets up the connection,
@@ -97,8 +98,9 @@ void start_server(int port);
  */
 void session_to_str(int session_id, char result[]) {
     memset(result, 0, BUFFER_LEN);
+	pthread_mutex_lock(&session_list_mutex);
     session_t session = session_list[session_id];
-
+	pthread_mutex_unlock(&session_list_mutex);
     for (int i = 0; i < NUM_VARIABLES; ++i) {
         if (session.variables[i]) {
             char line[32];
@@ -223,7 +225,9 @@ bool process_message(int session_id, const char message[]) {
 void broadcast(int session_id, const char message[]) {
     for (int i = 0; i < NUM_BROWSER; ++i) {
         if (browser_list[i].in_use && browser_list[i].session_id == session_id) {
+			pthread_mutex_lock(&browser_list_mutex);
             send_message(browser_list[i].socket_fd, message);
+			pthread_mutex_unlock(&browser_list_mutex);
         }
     }
 }
@@ -256,7 +260,9 @@ void load_all_sessions() {
 		sscanf(path, "./sessions/session%d.dat", &s_id);
 
 		if (fp = fopen(path, "r")) {
+			pthread_mutex_lock(&session_list_mutex);
 			fread(&session_list[i], sizeof(struct session_struct), 1, fp);
+			pthread_mutex_unlock(&session_list_mutex);
 			fclose(fp);
 		}
 	}
@@ -273,8 +279,9 @@ void save_session(int session_id) {
 	
 	FILE* fp;
 	char path[SESSION_PATH_LEN];
+	pthread_mutex_lock(&session_list_mutex);
 	struct session_struct current = session_list[session_id];
-	
+	pthread_mutex_unlock(&session_list_mutex);
 	get_session_file_path(session_id, path);
 	fp = fopen(path, "w");
 	fwrite(&current, sizeof(struct session_struct), 1, fp);
@@ -324,7 +331,9 @@ int register_browser(int browser_socket_fd) {
 			pthread_mutex_unlock(&session_list_mutex);	
         }
     }
+	pthread_mutex_lock(&browser_list_mutex);
     browser_list[browser_id].session_id = session_id;
+	pthread_mutex_unlock(&browser_list_mutex);
 
     sprintf(message, "%d", session_id);
     send_message(browser_socket_fd, message);
@@ -339,26 +348,27 @@ int register_browser(int browser_socket_fd) {
  *
  * @param browser_socket_fd the socket file descriptor of the browser connected
  */
-void browser_handler(int browser_socket_fd) {
+void browser_handler(void * browser_socket) {
+	int browser_socket_fd = (int) (uintptr_t) browser_socket;
     int browser_id;
 
     browser_id = register_browser(browser_socket_fd);
-
+	
+    pthread_mutex_lock(&browser_list_mutex);
     int socket_fd = browser_list[browser_id].socket_fd;
+	printf("sock brws %d %d\n", browser_socket_fd, socket_fd);
     int session_id = browser_list[browser_id].session_id;
-
+    pthread_mutex_unlock(&browser_list_mutex);
     printf("Successfully accepted Browser #%d for Session #%d.\n", browser_id, session_id);
 
     while (true) {
         char message[BUFFER_LEN];
         char response[BUFFER_LEN];
 	
-        if (message[0] == '\0') {
-            continue;
-        }
-        receive_message(socket_fd, message);
+        ssize_t output = receive_message(socket_fd, message);
         printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
-
+		printf("status: %i\n", output);
+		perror("WHY");
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
             close(socket_fd);
             pthread_mutex_lock(&browser_list_mutex);
@@ -368,16 +378,18 @@ void browser_handler(int browser_socket_fd) {
             return;
         }
 
-        if (message[0] == '\0') {
-            continue;
-        }
+//        if (message[0] == '\0') {
+//            continue;
+//        }
 
         bool data_valid = process_message(session_id, message);
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
+			printf("not valid\n");
             continue;
         }
 
+		sprintf(response, "not yet implemented\n");
         session_to_str(session_id, response);
         broadcast(session_id, response);
 
@@ -421,6 +433,9 @@ void start_server(int port) {
     printf("The server is now listening on port %d.\n", port);
 
     // Main loop to accept new browsers and creates handlers for them.
+	
+	pthread_t thread_ids[NUM_BROWSER];
+	int index = 0;
     while (true) {
         struct sockaddr_in browser_address;
         socklen_t browser_address_len = sizeof(browser_address);
@@ -432,11 +447,15 @@ void start_server(int port) {
 
         // Starts the handler thread for the new browser.
         // TODO: For Part 2.1, create a thread to run browser_handler() here.
-		pthread_t thread_id;
-		pthread_create(&thread_id, NULL, (void *) browser_handler, (void *) &browser_socket_fd);
-		pthread_join(thread_id, NULL);
+		pthread_create(&thread_ids[index], NULL, (void *) browser_handler, (void *) browser_socket_fd);
+	//	pthread_join(thread_id, NULL);
+		index++;
 	//	browser_handler(browser_socket_fd);
     }
+
+	for (int i = 0; i < index; i++) {
+		pthread_join(thread_ids[i], NULL);
+	}
 
     // Closes the socket.
     close(server_socket_fd);
@@ -458,12 +477,12 @@ int main(int argc, char *argv[]) {
         port = strtol(argv[2], NULL, 10);
 
     } else {
-        puts("Invalid arguments.");
+        puts("Invalid arguments.\n");
         exit(EXIT_FAILURE);
     }
 
     if (port < 1024) {
-        puts("Invalid port.");
+        puts("Invalid port.\n");
         exit(EXIT_FAILURE);
     }
 
