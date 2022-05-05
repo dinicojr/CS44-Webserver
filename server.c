@@ -547,7 +547,7 @@ void browser_handler(void * browser_socket) {
             sprintf(response, "user input invalid\n");
             continue;
         }
-        
+
 		//sprintf(response, "not yet implemented\n");
         session_to_str(session_id, response);
         broadcast(session_id, response);
