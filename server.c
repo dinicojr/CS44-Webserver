@@ -58,7 +58,7 @@ typedef struct hashmap_struct {
 
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
 
-hashmap_t* m = (hashmap_t*) malloc(sizeof(hashmap_t));
+//static hashmap_t* m = (hashmap_t*) malloc(sizeof(hashmap_t));
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
 
@@ -162,7 +162,7 @@ bool is_str_numeric(const char str[]) {
  * @param message the message to be processed
  * @return a boolean that determines if the given message is valid
  */
-bool process_message(int session_id, const char message[]) {
+bool process_message_old(int session_id, const char message[]) {
     char *token;
     int result_idx;
     double first_value;
@@ -176,8 +176,8 @@ bool process_message(int session_id, const char message[]) {
     // Makes a copy of the string since strtok() will modify the string that it is processing.
     char data[BUFFER_LEN];
     strcpy(data, message);
-
-    // Processes the result variable.
+    
+	// Processes the result variable.
     token = strtok(data, " ");
     result_idx = token[0] - 'a';
 
@@ -242,6 +242,121 @@ bool process_message(int session_id, const char message[]) {
     }
 
     return true;
+}
+
+
+bool process_message(int session_id, const char message[]) {
+
+	char* token;
+	char symbol;
+	int result_idx;
+	double first_value, second_value;
+
+	char data[BUFFER_LEN];
+	strcpy(data, message);
+	puts("data copied\n");
+
+	//Process result
+	token = strtok(data, " ");
+	puts("1\n");
+	if (!isalpha(token[0])) {
+		puts("ERROR: Result not a variable\n");
+		return false;
+	}
+
+	puts("2\n");
+	result_idx = tolower(token[0]) - 'a';
+	puts("result processed\n");
+
+	//Processes "="
+	token = strtok(NULL, " ");
+	if (*token != '=') {
+		puts("ERROR: Equals sign not found\n");
+		return false;
+	}
+	puts("equals processed\n");
+	
+	//Processing first value
+	
+	token = strtok(NULL, " ");
+	if (is_str_numeric(token)) {
+		first_value = strtod(token, NULL);
+	} else if (isalpha(*token)) {
+		int first_idx = tolower(token[0]) - 'a';
+		if (!session_list[session_id].variables[result_idx]) {
+			puts("ERROR: First variable does not exist\n");
+			return false;
+		}
+		
+		first_value = session_list[session_id].values[first_idx];
+	} else {
+		puts("ERROR: Syntax error in the first variable\n");
+		return false;
+	}
+	puts("first value processed\n");
+
+	// Processes the operator
+	
+	token = strtok(NULL, " ");
+	if (token == NULL) {
+		session_list[session_id].variables[result_idx] = true;
+		session_list[session_id].values[result_idx] = first_value;
+		return true;
+	}
+	symbol = token[0];
+	if (symbol != '+' && symbol != '-' && symbol != '*' && symbol != '/') {
+		printf("ERROR: Invalid operator: %i\n", symbol);
+		return false;
+	}
+	puts("operator processed\n");
+
+	//Process the second value
+	token = strtok(NULL, " ");
+	if (is_str_numeric(token)) {
+		second_value = strtod(token, NULL);
+	} else if (isalpha(*token)) {
+		int second_idx = tolower(token[0]) - 'a';
+		if (!session_list[session_id].variables[result_idx]) {
+			puts("ERROR: Second variable does not exist\n");
+			return false;
+		}
+
+		second_value = session_list[session_id].values[second_idx];
+	} else {
+		puts("ERROR: Syntax error in the second variable\n");
+		return false;
+	}
+	puts("second value processed\n");
+
+	//No data should remain
+	token = strtok(NULL, " ");
+
+	if (token) {
+		puts("ERROR: Too much input\n");
+		return false;
+	}
+
+	puts("finshed processing\n");
+
+	session_list[session_id].variables[result_idx] = true;
+
+	switch (symbol) {
+		case '+':
+			session_list[session_id].values[result_idx] = first_value + second_value;
+			break;
+		case '-':
+			session_list[session_id].values[result_idx] = first_value - second_value;
+			break;
+		case '*':
+			session_list[session_id].values[result_idx] = first_value * second_value;
+			break;
+		case '/':
+			session_list[session_id].values[result_idx] = first_value / second_value;
+	}
+
+	puts("math complete\n");
+
+	return true;
 }
 
 /**
@@ -395,7 +510,7 @@ void browser_handler(void * browser_socket) {
 	
         ssize_t output = receive_message(socket_fd, message);
         printf("Received message from Browser #%d for Session #%d: %s\n", browser_id, session_id, message);
-		printf("status: %i\n", output);
+		printf("status: %li\n", output);
 		perror("WHY");
         if ((strcmp(message, "EXIT") == 0) || (strcmp(message, "exit") == 0)) {
             close(socket_fd);
@@ -475,7 +590,7 @@ void start_server(int port) {
 
         // Starts the handler thread for the new browser.
         // TODO: For Part 2.1, create a thread to run browser_handler() here.
-		pthread_create(&thread_ids[index], NULL, (void *) browser_handler, (void *) browser_socket_fd);
+		pthread_create(&thread_ids[index], NULL, (void *) browser_handler, (void *) (intptr_t) browser_socket_fd);
 	//	pthread_join(thread_id, NULL);
 		index++;
 	//	browser_handler(browser_socket_fd);
