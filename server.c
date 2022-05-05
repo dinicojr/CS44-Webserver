@@ -30,6 +30,7 @@
 #define NUM_BROWSER 128
 #define DATA_DIR "./sessions"
 #define SESSION_PATH_LEN 128
+#define HASH_SIZE 128
 
 typedef struct browser_struct {
     bool in_use;
@@ -45,22 +46,36 @@ typedef struct session_struct {
 
 static browser_t browser_list[NUM_BROWSER];                             // Stores the information of all browsers.
 // TODO: For Part 3.2, convert the session_list to a simple hashmap/dictionary.
-typedef struct entry_struct {
-    session_t* session; //data
-    int key; //key
-    struct entry_struct* collision;
-} hash_entry_t;
+typedef struct entry {
 
-typedef struct hashmap_struct {
-    hash_entry_t *entries; //data
+	session_t* session;
+	int key;
+	struct entry* next;
+} entry_t;
+
+typedef struct hashmap {
+	entry** map;
+	unsigned int capacity;
+	unsigned int length;
 } hashmap_t;
-
 
 static session_t session_list[NUM_SESSIONS];                            // Stores the information of all sessions.
 
 //static hashmap_t* m = (hashmap_t*) malloc(sizeof(hashmap_t));
 static pthread_mutex_t browser_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the browser list.
 static pthread_mutex_t session_list_mutex = PTHREAD_MUTEX_INITIALIZER;  // A mutex lock for the session list.
+
+
+hashmap_t* new_hashmap();
+
+unsigned hash(hashmap_t* map, int key);
+
+session_t* get(hashmap_t* map, int key);
+
+int set(hashmap_t* map, session_t* session);
+
+bool destroy(hashmap_t* map, int key);
+
 
 // Returns the string format of the given session.
 // There will be always 9 digits in the output string.
@@ -529,7 +544,7 @@ void browser_handler(void * browser_socket) {
         if (!data_valid) {
             // TODO: For Part 3.1, add code here to send the error message to the browser.
 			printf("not valid\n");
-            sprintf(response, "user input invalid\n")
+            sprintf(response, "user input invalid\n");
             continue;
         }
         
@@ -603,6 +618,94 @@ void start_server(int port) {
 
     // Closes the socket.
     close(server_socket_fd);
+}
+
+
+hashmap_t* new_hashmap() {
+
+	hashmap_t* map = malloc(sizeof(hashmap_t));
+	map->capacity = HASH_SIZE;
+	map->length = 0;
+	map->map = calloc(map->capacity, sizeof(entry_t*));
+	return map;
+}
+
+unsigned hash(hashmap_t* map, int key) {
+
+	return key * 37 % HASH_SIZE;
+}
+
+session_t* get(hashmap_t* map, int key) {
+
+	entry_t* current;
+	
+	for (current = map->map[hash(map, key)]; current; current = current->next) {
+		if (!strcmp(current->key, key)) {
+			return current->session;
+		}
+	}
+}
+
+
+int set(hashmap_t* map, int key, session_t* session) {
+
+	unsigned index = hash(map, key);
+	entry_t* current;
+
+	for (current = map->map[index]; current; current = current->next) {
+		if (!strcmp(current->key, key)) {
+			current->session = session;
+			return current->key;
+		}
+	}
+
+	entry_t* e = malloc(sizeof(*e));
+	e->key = key;
+	e->session = session;
+	p->next = map->map[index];
+	map->map[index] = p;
+	this->length++;
+	return index;
+}
+
+bool destroy(hashmap_t* map, int key) {
+	int index = hash(map, key);
+	entry_t* entry = map->map[index];
+
+	if (!entry->next) {
+		free(entry->session);
+		free(entry);
+		return true;
+	}
+
+	entry_t* previous = NULL;
+
+	while (entry) {
+		if (entry-> key == key) {
+			entry_t* next = entry->next;
+			if (next) {
+				if (!previous) {
+					entry_t* new_entry;
+					new_entry->session = entry->session;
+					new_entry->next = next->next;
+					new_entry->key = key;
+					map->map[index] = new_entry;
+				} else {
+					previous->next = next;
+				}
+			}
+			free(entry->next);
+			free(entry->session);
+			free(entry);
+			entry = NULL;
+
+			return true;
+		}
+		previous = entry;
+		entry = entry->next;
+	}
+
+	return false;
 }
 
 /**
